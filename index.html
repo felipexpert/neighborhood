@@ -1,0 +1,98 @@
+<div><input type="file"></div>
+<div><button id="stop">Stop!</button></div>
+<div><button id="download">Download</button></div>
+<div></div>
+<div id="total">Total 0</div>
+<div id="output"></div>
+<script type="text/javascript"
+     src="http://maps.google.com/maps/api/js?sensor=false&key=AIzaSyD2k2rjw6zIXcCSj8sEkflYy4QC8mjpVe4">
+</script> 
+<script>
+  "use strict";
+
+  var input = document.querySelector("input"),
+      t = 0,
+      total = document.querySelector("#total"),
+      output = document.querySelector("#output"),
+      intervalCode = null,
+      stopButton = document.querySelector("#stop"),
+      downloadButton = document.querySelector("#download"),
+      updateQueries = "",
+      textFile = null;
+
+  input.addEventListener("change", function() {
+    if(input.files.length > 0) {
+      var file = input.files[0],
+          reader = new FileReader();
+      reader.addEventListener("load", function() {
+        console.log(reader.result);
+        var content = reader.result,
+            ns = JSON.parse(content),
+            todo = ns.bairros.map(function(n) {
+              return function() {
+                var address = n.nome 
+                    + ", " + n.cidade 
+                    + ", " + n.estado
+                    + ", Brasil";
+                console.log("Going  to get coordenates for the address", address, "id", n.id);
+                gen(address, n.id);
+              };
+            }),
+            index = 0;
+        intervalCode = setInterval(function() {
+          if(index < todo.length) {
+            todo[index]();
+            index++;
+          } else {
+            clearInterval(intervalCode);
+            intervalCode = null;
+          }
+        }, 200);
+      });
+      reader.readAsText(file);
+    }
+  });
+
+  stopButton.addEventListener("click", function() {
+    if(intervalCode != null) {
+      clearInterval(intervalCode);
+      intervalCode = null;
+    }
+  });
+
+  downloadButton.addEventListener("click", function() {
+    window.open(makeTextFile());
+  });
+
+  function gen(address, id) {
+    var geocoder = new google.maps.Geocoder();
+    geocoder.geocode( { "address": address}, function(results, status) {
+      if (status == google.maps.GeocoderStatus.OK) {
+        var lat = results[0].geometry.location.lat(),
+            lng = results[0].geometry.location.lng(),
+            updateQuery = "update bairros set lat = " 
+                + lat + ", lng = " 
+                + lng +" where id = " 
+                + id + ";",
+            p = document.createElement("p");
+        p.textContent = updateQuery;
+        updateQueries += updateQuery + "\n";
+        output.appendChild(p);
+        t++;
+        total.textContent = "Total " + t;
+      }
+    });
+  }
+ 
+  function makeTextFile() {
+    var data = new Blob([updateQueries], {type: "text/plain"});
+    // If we are replacing a previously generated file we need to
+    // manually revoke the object URL to avoid memory leaks.
+    if(textFile !== null) window.URL.revokeObjectURL(textFile);
+    
+    textFile = window.URL.createObjectURL(data);
+
+    // returns a URL you can use as a href
+    return textFile;
+  }
+</script>
